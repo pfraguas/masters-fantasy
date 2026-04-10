@@ -258,6 +258,10 @@
       background: rgba(212,175,55,0.08);
     }
 
+    .tourney-table .cut-row td {
+      opacity: 0.45;
+    }
+
     .error-banner {
       background: rgba(231,76,60,0.15);
       border: 1px solid rgba(231,76,60,0.3);
@@ -440,9 +444,49 @@
       return posMap;
     }
 
-    function processTeams(competitors) {
+    function determineCutSet(competitors, compStatus) {
+      // After round 2, Masters cut = top 50 and ties
+      const statusType = (compStatus || {}).type || {};
+      const round = (compStatus || {}).period || 1;
+      const isRound2Done = round >= 2 &&
+        (statusType.state === "post" || statusType.description === "Play Complete" || round >= 3);
+
+      if (!isRound2Done) return new Set();
+
+      // ESPN may explicitly mark CUT in the score field
+      const explicitCut = new Set();
+      competitors.forEach(c => {
+        const s = (c.score || "").toUpperCase();
+        if (["CUT", "WD", "DQ", "MDF"].includes(s)) {
+          explicitCut.add((c.athlete || {}).displayName.toLowerCase());
+        }
+      });
+      if (explicitCut.size > 0) return explicitCut;
+
+      // Otherwise, calculate: top 50 and ties
+      const sorted = [...competitors].sort((a, b) => (a.order || 999) - (b.order || 999));
+      if (sorted.length <= 50) return new Set();
+
+      const cutScore = sorted[49].score; // score at position 50
+      // Everyone tied at cutScore makes it
+      let lastIn = 0;
+      for (const c of sorted) {
+        if (c.score === cutScore) lastIn = Math.max(lastIn, c.order || 0);
+      }
+
+      const cutSet = new Set();
+      for (const c of sorted) {
+        if ((c.order || 0) > lastIn) {
+          cutSet.add(((c.athlete || {}).displayName || "").toLowerCase());
+        }
+      }
+      return cutSet;
+    }
+
+    function processTeams(competitors, compStatus) {
       const playerMap = new Map();
       const posMap = buildTiedPositions(competitors);
+      const cutSet = determineCutSet(competitors, compStatus);
       competitors.forEach(c => {
         const name = (c.athlete || {}).displayName || "";
         playerMap.set(name.toLowerCase(), c);
@@ -455,18 +499,21 @@
 
           const rawScore = comp.score;
           const score = parseScore(rawScore);
-          const isCut = rawScore && ["CUT", "WD", "DQ", "MDF"].includes(rawScore.toUpperCase());
+          const explicitCut = rawScore && ["CUT", "WD", "DQ", "MDF"].includes(rawScore.toUpperCase());
+          const isCut = explicitCut || cutSet.has(name.toLowerCase());
 
           const posInfo = posMap.get(name.toLowerCase()) || { pos: comp.order || 999, tied: false };
+
+          const statusLabel = explicitCut ? rawScore.toUpperCase() : (isCut ? "CUT" : null);
 
           return {
             name,
             score,
-            scoreStr: isCut ? rawScore.toUpperCase() : formatScore(score),
+            scoreStr: isCut ? (statusLabel + " (" + formatScore(score) + ")") : formatScore(score),
             pos: posInfo.pos,
             tied: posInfo.tied,
             active: score !== null && !isCut,
-            status: isCut ? rawScore.toUpperCase() : (score !== null ? "active" : "N/A")
+            status: statusLabel || (score !== null ? "active" : "N/A")
           };
         });
 
@@ -562,6 +609,9 @@
           html += `<div class="player-name">${getLastName(p.name)}</div>`;
           if (p.status === "CUT" || p.status === "WD" || p.status === "DQ" || p.status === "MDF") {
             html += `<div class="player-score" style="color:var(--over-par)">${p.status}</div>`;
+            if (p.score !== null) {
+              html += `<div class="player-pos" style="color:var(--over-par)">${formatScore(p.score)}</div>`;
+            }
           } else if (p.status === "N/A") {
             html += `<div class="player-score" style="color:var(--text-muted)">N/A</div>`;
           } else {
@@ -576,10 +626,11 @@
       container.innerHTML = html;
     }
 
-    function renderTourney(competitors, currentRound) {
+    function renderTourney(competitors, currentRound, compStatus) {
       const container = document.getElementById("tourney-leaderboard");
       const sorted = [...competitors].sort((a, b) => (a.order || 999) - (b.order || 999));
       const posMap = buildTiedPositions(competitors);
+      const cutSet = determineCutSet(competitors, compStatus);
 
       let html = '<table class="tourney-table">';
       html += `<thead><tr>
@@ -602,12 +653,17 @@
         const today = getTodayScore(c, currentRound) || "—";
         const todayN = parseScore(today);
         const isFantasy = fantasyPlayerNames.has(name.toLowerCase());
+        const isCut = cutSet.has(name.toLowerCase());
         const posInfo = posMap.get(name.toLowerCase()) || { pos: c.order || "—", tied: false };
         const posLabel = posInfo.tied ? `T${posInfo.pos}` : `${posInfo.pos}`;
 
-        html += `<tr class="${isFantasy ? 'highlight' : ''}">`;
+        let rowClass = "";
+        if (isCut) rowClass = "cut-row";
+        else if (isFantasy) rowClass = "highlight";
+
+        html += `<tr class="${rowClass}">`;
         html += `<td class="pos-col">${posLabel}</td>`;
-        html += `<td>${name}</td>`;
+        html += `<td>${name}${isCut ? ' <span style="color:var(--over-par);font-size:0.75rem">CUT</span>' : ''}</td>`;
         html += `<td class="score-col ${scoreClass(scoreN)}">${formatScore(scoreN) || score}</td>`;
         html += `<td class="round-col ${scoreClass(todayN)}">${today}</td>`;
         html += `<td class="thru-col">${thru}</td>`;
@@ -653,9 +709,9 @@
           statusType.detail || statusType.description || event.name || "Masters Tournament";
 
         // Process and render
-        const teamResults = processTeams(competitors);
+        const teamResults = processTeams(competitors, status);
         renderFantasy(teamResults, currentRound);
-        renderTourney(competitors, currentRound);
+        renderTourney(competitors, currentRound, status);
 
         // Show toggle button
         document.getElementById("toggle-tourney").style.display = "block";
