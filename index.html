@@ -111,6 +111,11 @@
       box-shadow: 0 0 12px rgba(212,175,55,0.15);
     }
 
+    .team-card.eliminated {
+      opacity: 0.5;
+      border-color: var(--over-par);
+    }
+
     .team-header {
       display: flex;
       align-items: center;
@@ -161,11 +166,12 @@
     }
 
     .player-cell.dropped {
-      opacity: 0.35;
+      opacity: 0.55;
     }
 
     .player-cell.cut {
-      opacity: 0.5;
+      background: rgba(231,76,60,0.08);
+      border-left: 3px solid var(--over-par);
     }
 
     .player-name {
@@ -449,11 +455,15 @@
         let countingPlayers = [];
         let droppedPlayer = null;
 
-        if (active.length >= 3) {
+        // Check if team is eliminated (2+ players cut/WD/DQ)
+        const cutCount = playersData.filter(p => ["CUT","WD","DQ","MDF"].includes(p.status)).length;
+        const eliminated = cutCount >= 2;
+
+        if (!eliminated && active.length >= 3) {
           countingPlayers = active.slice(0, 3);
           droppedPlayer = active.length >= 4 ? active[3] : null;
           teamScore = countingPlayers.reduce((sum, p) => sum + p.score, 0);
-        } else if (active.length > 0) {
+        } else if (!eliminated && active.length > 0) {
           countingPlayers = active;
           teamScore = active.reduce((sum, p) => sum + p.score, 0);
         }
@@ -467,6 +477,7 @@
         return {
           owner: team.owner,
           teamScore,
+          eliminated,
           countingCount: countingPlayers.length,
           players: playersData
         };
@@ -496,16 +507,25 @@
         const isLeader = idx === 0 && team.teamScore !== null;
         const posLabel = team.teamScore !== null ? (idx + 1) : "—";
 
-        html += `<div class="team-card${isLeader ? ' leader' : ''}">`;
+        let cardClass = "team-card";
+        if (isLeader) cardClass += " leader";
+        if (team.eliminated) cardClass += " eliminated";
+
+        html += `<div class="${cardClass}">`;
         html += `<div class="team-header">`;
         html += `<div class="team-pos">${posLabel}</div>`;
         html += `<div class="team-owner">${team.owner}</div>`;
         html += `<div style="text-align:right">`;
-        html += `<div class="team-total ${scoreClass(team.teamScore)}">${formatScore(team.teamScore)}</div>`;
-        if (team.teamScore !== null && team.countingCount < 3) {
-          html += `<div class="team-total-label" style="color:var(--over-par)">solo ${team.countingCount} jugador${team.countingCount !== 1 ? 'es' : ''}</div>`;
+        if (team.eliminated) {
+          html += `<div class="team-total" style="color:var(--over-par)">ELIMINADO</div>`;
+          html += `<div class="team-total-label" style="color:var(--over-par)">2+ jugadores fuera</div>`;
         } else {
-          html += `<div class="team-total-label">best 3</div>`;
+          html += `<div class="team-total ${scoreClass(team.teamScore)}">${formatScore(team.teamScore)}</div>`;
+          if (team.teamScore !== null && team.countingCount < 3) {
+            html += `<div class="team-total-label" style="color:var(--over-par)">solo ${team.countingCount} jugador${team.countingCount !== 1 ? 'es' : ''}</div>`;
+          } else {
+            html += `<div class="team-total-label">best 3</div>`;
+          }
         }
         html += `</div></div>`;
 
