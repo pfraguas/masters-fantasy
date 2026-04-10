@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Masters Fantasy Pool 2026</title>
+  <style>
+    :root {
+      --augusta-green: #006747;
+      --augusta-dark: #004d35;
+      --gold: #d4af37;
+      --bg: #1a1a2e;
+      --card-bg: rgba(255,255,255,0.05);
+      --text: #fff;
+      --text-muted: #9a9a9a;
+      --under-par: #2ecc71;
+      --over-par: #e74c3c;
+      --even-par: #ccc;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--augusta-dark), var(--augusta-green));
+      padding: 24px 20px 20px;
+      text-align: center;
+      border-bottom: 3px solid var(--gold);
+    }
+
+    header h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 2rem;
+      letter-spacing: 2px;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    header .subtitle {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.8);
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.6);
+    }
+
+    .live-dot {
+      width: 8px; height: 8px;
+      background: var(--under-par);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .refresh-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.3);
+      color: rgba(255,255,255,0.7);
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+    .refresh-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+
+    .section-title {
+      font-family: Georgia, serif;
+      font-size: 1.1rem;
+      color: var(--gold);
+      margin-bottom: 16px;
+      letter-spacing: 1px;
+    }
+
+    /* Fantasy Leaderboard */
+    .team-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    .team-card.leader {
+      border-color: var(--gold);
+      box-shadow: 0 0 12px rgba(212,175,55,0.15);
+    }
+
+    .team-header {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      gap: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .team-pos {
+      font-family: Georgia, serif;
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: var(--gold);
+      min-width: 32px;
+      text-align: center;
+    }
+
+    .team-owner {
+      font-size: 1.05rem;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .team-total {
+      font-size: 1.3rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .team-total-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .team-players {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .player-cell {
+      padding: 10px 12px;
+      background: var(--bg);
+      text-align: center;
+    }
+
+    .player-cell.dropped {
+      opacity: 0.35;
+    }
+
+    .player-cell.cut {
+      opacity: 0.5;
+    }
+
+    .player-name {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-score {
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .player-pos {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .player-cell.cut .player-score {
+      color: var(--over-par);
+      font-size: 0.9rem;
+    }
+
+    .player-cell.dropped .player-name {
+      text-decoration: line-through;
+    }
+
+    .score-under { color: var(--under-par); }
+    .score-over { color: var(--over-par); }
+    .score-even { color: var(--even-par); }
+
+    /* Tournament leaderboard */
+    .toggle-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      margin: 24px 0 12px;
+      display: block;
+      width: 100%;
+    }
+    .toggle-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+    .tourney-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .tourney-table th {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tourney-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .tourney-table tr:hover td {
+      background: rgba(255,255,255,0.03);
+    }
+
+    .tourney-table .pos-col { width: 40px; text-align: center; color: var(--text-muted); }
+    .tourney-table .score-col { font-variant-numeric: tabular-nums; font-weight: 600; }
+    .tourney-table .thru-col { color: var(--text-muted); font-size: 0.8rem; }
+    .tourney-table .round-col { font-variant-numeric: tabular-nums; color: var(--text-muted); text-align: center; }
+
+    .tourney-table .highlight td {
+      background: rgba(212,175,55,0.08);
+    }
+
+    .error-banner {
+      background: rgba(231,76,60,0.15);
+      border: 1px solid rgba(231,76,60,0.3);
+      color: #e74c3c;
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+
+    .loading .spinner {
+      width: 30px; height: 30px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--augusta-green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: rgba(255,255,255,0.2);
+      font-size: 0.75rem;
+    }
+
+    @media (max-width: 640px) {
+      header h1 { font-size: 1.4rem; }
+      .team-players { grid-template-columns: repeat(2, 1fr); }
+      .team-header { padding: 10px 12px; }
+      .player-cell { padding: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Masters Fantasy Pool</h1>
+    <div class="subtitle" id="tournament-status">Cargando...</div>
+    <div class="status-bar">
+      <span class="live-dot" id="live-dot"></span>
+      <span id="last-updated">—</span>
+      <button class="refresh-btn" onclick="fetchAndRender()">Actualizar</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="error-banner" id="error-banner"></div>
+    <div id="fantasy-leaderboard">
+      <div class="loading">
+        <div class="spinner"></div>
+        Cargando scores del Masters...
+      </div>
+    </div>
+
+    <button class="toggle-btn" id="toggle-tourney" onclick="toggleTourney()" style="display:none">
+      ▼ Leaderboard del Torneo
+    </button>
+    <div id="tourney-leaderboard" style="display:none"></div>
+  </main>
+
+  <footer>Masters Fantasy Pool 2026 — Datos: ESPN</footer>
+
+  <script>
+    // =====================================================
+    //  CONFIGURACIÓN DE EQUIPOS — COMPLETAR AQUÍ
+    // =====================================================
+    const TEAMS = [
+      {
+        owner: "JP",
+        players: ["Scottie Scheffler", "Ludvig Åberg", "Shane Lowry", "Jordan Spieth"]
+      },
+      {
+        owner: "Pancho",
+        players: ["Scottie Scheffler", "Ludvig Åberg", "Jason Day", "Jordan Spieth"]
+      },
+      {
+        owner: "Pedro",
+        players: ["Cameron Young", "Jon Rahm", "Jake Knapp", "Adam Scott"]
+      },
+      {
+        owner: "Nicolo",
+        players: ["Scottie Scheffler", "Bryson DeChambeau", "Sam Burns", "Max Greyserman"]
+      },
+      {
+        owner: "Franco",
+        players: ["Matt Fitzpatrick", "Ludvig Åberg", "Nico Echavarria", "Gary Woodland"]
+      }
+      // Agregar más equipos siguiendo el mismo formato.
+      // Los nombres deben coincidir con los de ESPN (athlete.displayName).
+    ];
+    // =====================================================
+
+    const API_URL = "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard";
+    const REFRESH_MS = 60000;
+
+    let lastData = null;
+    let refreshInterval = null;
+    let tourneyVisible = false;
+
+    // All fantasy player names (lowercase) for highlighting in tourney leaderboard
+    const fantasyPlayerNames = new Set(
+      TEAMS.flatMap(t => t.players.map(p => p.toLowerCase()))
+    );
+
+    function parseScore(scoreStr) {
+      if (!scoreStr || scoreStr === "--") return null;
+      if (scoreStr === "E") return 0;
+      if (["CUT", "WD", "DQ", "MDF"].includes(scoreStr.toUpperCase())) return null;
+      const n = parseInt(scoreStr, 10);
+      return isNaN(n) ? null : n;
+    }
+
+    function formatScore(n) {
+      if (n === null || n === undefined) return "—";
+      if (n === 0) return "E";
+      return n > 0 ? `+${n}` : `${n}`;
+    }
+
+    function scoreClass(n) {
+      if (n === null || n === undefined) return "";
+      if (n < 0) return "score-under";
+      if (n > 0) return "score-over";
+      return "score-even";
+    }
+
+    function getLastName(fullName) {
+      const parts = fullName.split(" ");
+      return parts.length > 1 ? parts.slice(1).join(" ") : fullName;
+    }
+
+    function getThru(competitor, currentRound) {
+      const linescores = competitor.linescores || [];
+      if (linescores.length === 0) return "";
+      const lastRound = linescores[linescores.length - 1];
+      const holes = (lastRound.linescores || []).length;
+      if (lastRound.period < currentRound) return "—";
+      if (holes >= 18) return "F";
+      if (holes === 0) return "—";
+      return holes.toString();
+    }
+
+    function getTodayScore(competitor, currentRound) {
+      const linescores = competitor.linescores || [];
+      const roundData = linescores.find(r => r.period === currentRound);
+      if (!roundData) return null;
+      return roundData.displayValue || null;
+    }
+
+    function findMastersEvent(data) {
+      const events = data.events || [];
+      return events.find(e => (e.name || "").toLowerCase().includes("masters")) || events[0] || null;
+    }
+
+    function processTeams(competitors) {
+      const playerMap = new Map();
+      competitors.forEach(c => {
+        const name = (c.athlete || {}).displayName || "";
+        playerMap.set(name.toLowerCase(), c);
+      });
+
+      const teamResults = TEAMS.map(team => {
+        const playersData = team.players.map(name => {
+          const comp = playerMap.get(name.toLowerCase());
+          if (!comp) return { name, score: null, scoreStr: "N/A", order: 999, active: false, status: "N/A" };
+
+          const rawScore = comp.score;
+          const score = parseScore(rawScore);
+          const isCut = rawScore && ["CUT", "WD", "DQ", "MDF"].includes(rawScore.toUpperCase());
+
+          return {
+            name,
+            score,
+            scoreStr: isCut ? rawScore.toUpperCase() : formatScore(score),
+            order: comp.order || 999,
+            active: score !== null && !isCut,
+            status: isCut ? rawScore.toUpperCase() : (score !== null ? "active" : "N/A")
+          };
+        });
+
+        // Sort active players by score ascending (best first)
+        const active = playersData.filter(p => p.active).sort((a, b) => a.score - b.score);
+        const inactive = playersData.filter(p => !p.active);
+
+        let teamScore = null;
+        let countingPlayers = [];
+        let droppedPlayer = null;
+
+        if (active.length >= 3) {
+          countingPlayers = active.slice(0, 3);
+          droppedPlayer = active.length >= 4 ? active[3] : null;
+          teamScore = countingPlayers.reduce((sum, p) => sum + p.score, 0);
+        } else if (active.length > 0) {
+          countingPlayers = active;
+          teamScore = active.reduce((sum, p) => sum + p.score, 0);
+        }
+
+        // Mark dropped
+        const droppedName = droppedPlayer ? droppedPlayer.name.toLowerCase() : null;
+        playersData.forEach(p => {
+          p.dropped = p.name.toLowerCase() === droppedName;
+        });
+
+        return {
+          owner: team.owner,
+          teamScore,
+          countingCount: countingPlayers.length,
+          players: playersData
+        };
+      });
+
+      // Sort by team score
+      teamResults.sort((a, b) => {
+        if (a.teamScore === null && b.teamScore === null) return 0;
+        if (a.teamScore === null) return 1;
+        if (b.teamScore === null) return -1;
+        return a.teamScore - b.teamScore;
+      });
+
+      return teamResults;
+    }
+
+    function renderFantasy(teamResults, currentRound) {
+      const container = document.getElementById("fantasy-leaderboard");
+      if (!teamResults.length) {
+        container.innerHTML = '<div class="loading">No hay datos disponibles</div>';
+        return;
+      }
+
+      let html = '<div class="section-title">Fantasy Leaderboard — Best 3 of 4</div>';
+
+      teamResults.forEach((team, idx) => {
+        const isLeader = idx === 0 && team.teamScore !== null;
+        const posLabel = team.teamScore !== null ? (idx + 1) : "—";
+
+        html += `<div class="team-card${isLeader ? ' leader' : ''}">`;
+        html += `<div class="team-header">`;
+        html += `<div class="team-pos">${posLabel}</div>`;
+        html += `<div class="team-owner">${team.owner}</div>`;
+        html += `<div style="text-align:right">`;
+        html += `<div class="team-total ${scoreClass(team.teamScore)}">${formatScore(team.teamScore)}</div>`;
+        if (team.teamScore !== null && team.countingCount < 3) {
+          html += `<div class="team-total-label" style="color:var(--over-par)">solo ${team.countingCount} jugador${team.countingCount !== 1 ? 'es' : ''}</div>`;
+        } else {
+          html += `<div class="team-total-label">best 3</div>`;
+        }
+        html += `</div></div>`;
+
+        html += `<div class="team-players">`;
+        team.players.forEach(p => {
+          let cellClass = "player-cell";
+          if (!p.active && p.status !== "active") cellClass += " cut";
+          if (p.dropped) cellClass += " dropped";
+
+          html += `<div class="${cellClass}">`;
+          html += `<div class="player-name">${getLastName(p.name)}</div>`;
+          if (p.status === "CUT" || p.status === "WD" || p.status === "DQ" || p.status === "MDF") {
+            html += `<div class="player-score" style="color:var(--over-par)">${p.status}</div>`;
+          } else if (p.status === "N/A") {
+            html += `<div class="player-score" style="color:var(--text-muted)">N/A</div>`;
+          } else {
+            html += `<div class="player-score ${scoreClass(p.score)}">${p.scoreStr}</div>`;
+            html += `<div class="player-pos">T${p.order}</div>`;
+          }
+          html += `</div>`;
+        });
+        html += `</div></div>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderTourney(competitors, currentRound) {
+      const container = document.getElementById("tourney-leaderboard");
+      const sorted = [...competitors].sort((a, b) => (a.order || 999) - (b.order || 999));
+
+      let html = '<table class="tourney-table">';
+      html += `<thead><tr>
+        <th class="pos-col">Pos</th>
+        <th>Jugador</th>
+        <th>Total</th>
+        <th class="round-col">Hoy</th>
+        <th class="thru-col">Thru</th>`;
+      // Round columns
+      for (let r = 1; r <= Math.min(currentRound, 4); r++) {
+        html += `<th class="round-col">R${r}</th>`;
+      }
+      html += `</tr></thead><tbody>`;
+
+      sorted.forEach(c => {
+        const name = (c.athlete || {}).displayName || "?";
+        const score = c.score || "—";
+        const scoreN = parseScore(score);
+        const thru = getThru(c, currentRound);
+        const today = getTodayScore(c, currentRound) || "—";
+        const todayN = parseScore(today);
+        const isFantasy = fantasyPlayerNames.has(name.toLowerCase());
+
+        html += `<tr class="${isFantasy ? 'highlight' : ''}">`;
+        html += `<td class="pos-col">${c.order || "—"}</td>`;
+        html += `<td>${name}</td>`;
+        html += `<td class="score-col ${scoreClass(scoreN)}">${formatScore(scoreN) || score}</td>`;
+        html += `<td class="round-col ${scoreClass(todayN)}">${today}</td>`;
+        html += `<td class="thru-col">${thru}</td>`;
+
+        const linescores = c.linescores || [];
+        for (let r = 1; r <= Math.min(currentRound, 4); r++) {
+          const rd = linescores.find(l => l.period === r);
+          html += `<td class="round-col">${rd ? (rd.value || "—") : "—"}</td>`;
+        }
+        html += `</tr>`;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+
+    function toggleTourney() {
+      tourneyVisible = !tourneyVisible;
+      const el = document.getElementById("tourney-leaderboard");
+      const btn = document.getElementById("toggle-tourney");
+      el.style.display = tourneyVisible ? "block" : "none";
+      btn.textContent = tourneyVisible ? "▲ Ocultar Leaderboard del Torneo" : "▼ Leaderboard del Torneo";
+    }
+
+    async function fetchAndRender() {
+      try {
+        const resp = await fetch(API_URL);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        lastData = data;
+
+        const event = findMastersEvent(data);
+        if (!event) throw new Error("No se encontró el Masters");
+
+        const comp = (event.competitions || [])[0] || {};
+        const competitors = comp.competitors || [];
+        const status = (comp.status || event.status || {});
+        const statusType = status.type || {};
+        const currentRound = status.period || 1;
+
+        // Update header
+        document.getElementById("tournament-status").textContent =
+          statusType.detail || statusType.description || event.name || "Masters Tournament";
+
+        // Process and render
+        const teamResults = processTeams(competitors);
+        renderFantasy(teamResults, currentRound);
+        renderTourney(competitors, currentRound);
+
+        // Show toggle button
+        document.getElementById("toggle-tourney").style.display = "block";
+
+        // Update timestamp
+        const now = new Date();
+        document.getElementById("last-updated").textContent =
+          `Actualizado: ${now.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+
+        // Hide error
+        document.getElementById("error-banner").style.display = "none";
+
+        // Stop refresh if tournament ended
+        if (statusType.state === "post" && refreshInterval) {
+          clearInterval(refreshInterval);
+          refreshInterval = null;
+          document.getElementById("live-dot").style.display = "none";
+          document.getElementById("tournament-status").textContent += " — FINAL";
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
+        const banner = document.getElementById("error-banner");
+        banner.textContent = `Error al cargar datos: ${err.message}`;
+        banner.style.display = "block";
+      }
+    }
+
+    // Init
+    fetchAndRender();
+    refreshInterval = setInterval(fetchAndRender, REFRESH_MS);
+  </script>
+</body>
+</html>
