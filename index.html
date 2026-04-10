@@ -421,8 +421,28 @@
       return events.find(e => (e.name || "").toLowerCase().includes("masters")) || events[0] || null;
     }
 
+    function buildTiedPositions(competitors) {
+      const sorted = [...competitors].sort((a, b) => (a.order || 999) - (b.order || 999));
+      const posMap = new Map();
+      let i = 0;
+      while (i < sorted.length) {
+        const score = sorted[i].score;
+        const pos = i + 1;
+        let j = i;
+        while (j < sorted.length && sorted[j].score === score) {
+          const name = (sorted[j].athlete || {}).displayName || "";
+          const tied = (j + 1 < sorted.length && sorted[j + 1].score === score) || (j > i);
+          posMap.set(name.toLowerCase(), { pos, tied });
+          j++;
+        }
+        i = j;
+      }
+      return posMap;
+    }
+
     function processTeams(competitors) {
       const playerMap = new Map();
+      const posMap = buildTiedPositions(competitors);
       competitors.forEach(c => {
         const name = (c.athlete || {}).displayName || "";
         playerMap.set(name.toLowerCase(), c);
@@ -437,11 +457,14 @@
           const score = parseScore(rawScore);
           const isCut = rawScore && ["CUT", "WD", "DQ", "MDF"].includes(rawScore.toUpperCase());
 
+          const posInfo = posMap.get(name.toLowerCase()) || { pos: comp.order || 999, tied: false };
+
           return {
             name,
             score,
             scoreStr: isCut ? rawScore.toUpperCase() : formatScore(score),
-            order: comp.order || 999,
+            pos: posInfo.pos,
+            tied: posInfo.tied,
             active: score !== null && !isCut,
             status: isCut ? rawScore.toUpperCase() : (score !== null ? "active" : "N/A")
           };
@@ -543,7 +566,7 @@
             html += `<div class="player-score" style="color:var(--text-muted)">N/A</div>`;
           } else {
             html += `<div class="player-score ${scoreClass(p.score)}">${p.scoreStr}</div>`;
-            html += `<div class="player-pos">T${p.order}</div>`;
+            html += `<div class="player-pos">${p.tied ? 'T' : ''}${p.pos}</div>`;
           }
           html += `</div>`;
         });
@@ -556,6 +579,7 @@
     function renderTourney(competitors, currentRound) {
       const container = document.getElementById("tourney-leaderboard");
       const sorted = [...competitors].sort((a, b) => (a.order || 999) - (b.order || 999));
+      const posMap = buildTiedPositions(competitors);
 
       let html = '<table class="tourney-table">';
       html += `<thead><tr>
@@ -578,9 +602,11 @@
         const today = getTodayScore(c, currentRound) || "—";
         const todayN = parseScore(today);
         const isFantasy = fantasyPlayerNames.has(name.toLowerCase());
+        const posInfo = posMap.get(name.toLowerCase()) || { pos: c.order || "—", tied: false };
+        const posLabel = posInfo.tied ? `T${posInfo.pos}` : `${posInfo.pos}`;
 
         html += `<tr class="${isFantasy ? 'highlight' : ''}">`;
-        html += `<td class="pos-col">${c.order || "—"}</td>`;
+        html += `<td class="pos-col">${posLabel}</td>`;
         html += `<td>${name}</td>`;
         html += `<td class="score-col ${scoreClass(scoreN)}">${formatScore(scoreN) || score}</td>`;
         html += `<td class="round-col ${scoreClass(todayN)}">${today}</td>`;
