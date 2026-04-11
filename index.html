@@ -452,32 +452,45 @@
 
       if (!isRound2Done) return new Set();
 
-      // ESPN may explicitly mark CUT in the score field
+      // ESPN may explicitly mark CUT / WD / DQ / MDF in the score field
       const explicitCut = new Set();
       competitors.forEach(c => {
         const s = (c.score || "").toUpperCase();
         if (["CUT", "WD", "DQ", "MDF"].includes(s)) {
-          explicitCut.add((c.athlete || {}).displayName.toLowerCase());
+          explicitCut.add(((c.athlete || {}).displayName || "").toLowerCase());
         }
       });
       if (explicitCut.size > 0) return explicitCut;
 
-      // Otherwise, calculate: top 50 and ties
-      const sorted = [...competitors].sort((a, b) => (a.order || 999) - (b.order || 999));
-      if (sorted.length <= 50) return new Set();
+      // Otherwise, calculate cut using ONLY R1+R2 totals (the 36-hole score).
+      // Do NOT use live `order`/`score`, because during R3 those reflect the
+      // in-progress round and would wrongly drop players who are having a bad
+      // R3 but legitimately made the cut.
+      const coursePar = (() => {
+        // Try to infer par from any player: sum of (value - displayValue diff)
+        // Fallback: 72. Masters is par 72.
+        return 72;
+      })();
 
-      const cutScore = sorted[49].score; // score at position 50
-      // Everyone tied at cutScore makes it
-      let lastIn = 0;
-      for (const c of sorted) {
-        if (c.score === cutScore) lastIn = Math.max(lastIn, c.order || 0);
-      }
+      const r1r2 = competitors.map(c => {
+        const ls = c.linescores || [];
+        const r1 = ls.find(l => l.period === 1);
+        const r2 = ls.find(l => l.period === 2);
+        if (!r1 || !r2 || r1.value == null || r2.value == null) return null;
+        const toPar = (r1.value + r2.value) - (2 * coursePar);
+        return { name: ((c.athlete || {}).displayName || "").toLowerCase(), toPar };
+      }).filter(x => x !== null);
+
+      // If we don't have full R1+R2 data for enough players, bail out
+      // (avoid marking everyone as cut by mistake).
+      if (r1r2.length < 50) return new Set();
+
+      const sortedByR1R2 = [...r1r2].sort((a, b) => a.toPar - b.toPar);
+      const cutScore = sortedByR1R2[49].toPar; // 36-hole score at position 50
 
       const cutSet = new Set();
-      for (const c of sorted) {
-        if ((c.order || 0) > lastIn) {
-          cutSet.add(((c.athlete || {}).displayName || "").toLowerCase());
-        }
+      for (const p of sortedByR1R2) {
+        if (p.toPar > cutScore) cutSet.add(p.name);
       }
       return cutSet;
     }
